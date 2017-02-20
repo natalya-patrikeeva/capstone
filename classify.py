@@ -8,7 +8,7 @@ conn = sqlite3.connect('articles.sqlite')
 cur = conn.cursor()
 
 # select top authors
-top_author = 'SELECT author_unique FROM Counts WHERE count >= 100 ORDER BY count DESC'
+top_author = 'SELECT author_unique FROM Counts WHERE count >= 50 ORDER BY count DESC LIMIT 10'
 
 author_doc = []
 author_lst = []
@@ -51,7 +51,7 @@ print df['author'].value_counts()
 
 # Tokenizing abstract text
 from sklearn.feature_extraction.text import CountVectorizer
-count_vect = CountVectorizer(stop_words="english", analyzer = "word", ngram_range=(1, 5), token_pattern=r'\b\w+\b', max_features=10000)
+count_vect = CountVectorizer(stop_words="english", analyzer = "word", ngram_range=(3, 5), token_pattern=r'\b\w+\b', max_features=1000)
 
 data = count_vect.fit_transform(df['doc'])
 #print "data: ", data.shape
@@ -90,6 +90,8 @@ tfidf_transformer = TfidfTransformer()
 X_train_tfidf = tfidf_transformer.fit_transform(features_train).toarray()
 X_test_tfidf = tfidf_transformer.fit_transform(features_test).toarray()
 
+#print "Input data shape: ", X_train_tfidf.shape     #(1054, 10000)
+#######################
 # Logistic Regression - Benchmark
 from sklearn import linear_model
 print "starting log reg modeling..."
@@ -105,40 +107,44 @@ acc = accuracy_score(pred, labels_test)
 
 tt = time()-t0
 print("Training Log Regression took: {}").format(round(tt,3))
-print "Accuracy score on test data is {}.".format(round(acc,4))   
-
+print "Accuracy score on test data is {}.".format(round(acc,4))
+##################################
 # Tensor Flow
 #
-# 5000 features
+# 10000 features
 # 62 classes (authors)
 # Naive model first
 import tensorflow as tf
-x = tf.placeholder(tf.float32, [None, 10000])
-W = tf.Variable(tf.zeros([10000, 7]))
-b = tf.Variable(tf.zeros([7]))
-# model
-y = tf.nn.softmax(tf.matmul(x, W) + b)
+num_features = 1000
 
-# train
+x = tf.placeholder(tf.float32, [None, num_features])
+# W = tf.Variable(tf.zeros([num_features, len(author_lst)]))
+# b = tf.Variable(tf.zeros([len(author_lst)]))
+# # model
+# y = tf.nn.softmax(tf.matmul(x, W) + b)
+#
+# # train
 # y_ is the correct classes
-y_ = tf.placeholder(tf.float32, [None, 7])
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y))
-train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+y_ = tf.placeholder(tf.float32, [None, len(author_lst)])
+# cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y))
+# train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
 init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
-
-for i in range(1000):
-  sess.run(train_step, feed_dict={x: X_train_tfidf, y_: labels_train_tf})
-
-correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-# accuracy on test data.
-print "Tensor Flow accuracy on test data:"
-print(sess.run(accuracy, feed_dict={x: X_test_tfidf, y_: labels_test_tf}))
+#
+#
+# for i in range(1000):
+#   sess.run(train_step, feed_dict={x: X_train_tfidf, y_: labels_train_tf})
+#
+# correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
+# accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+#
+# # accuracy on test data.
+# print "Tensor Flow accuracy on test data:"
+# print(sess.run(accuracy, feed_dict={x: X_test_tfidf, y_: labels_test_tf}))
 
 # Multilayer convolutional network
+
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
   return tf.Variable(initial)
@@ -154,36 +160,36 @@ def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                         strides=[1, 2, 2, 1], padding='SAME')
 
-W_conv1 = weight_variable([1, 10, 1, 32])
-b_conv1 = bias_variable([32])
+W_conv1 = weight_variable([1, 25, 1, 64])
+b_conv1 = bias_variable([64])
 
-x_image = tf.reshape(x, [-1,1,10000,1])
+x_image = tf.reshape(x, [-1,1,num_features,1])
 h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
 print "h conv 1 size: ", h_conv1.get_shape()    # (?, 1, 10000, 32)
 
 h_pool1 = max_pool_2x2(h_conv1)
 print "h pool 1 size: ", h_pool1.get_shape()   # (?, 1, 5000, 32)
 
-W_conv2 = weight_variable([1, 10, 32, 64])
-b_conv2 = bias_variable([64])
+W_conv2 = weight_variable([1, 25, 64, 128])
+b_conv2 = bias_variable([128])
 
 h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
 print "h conv 2 size: ", h_conv2.get_shape()    # (?, 1, 5000, 64)
 h_pool2 = max_pool_2x2(h_conv2)
 print "h pool 2 size: ", h_pool2.get_shape()    # (?, 1, 2500, 64)
 
-W_fc1 = weight_variable([1 * 2500 * 64, 1024])
+W_fc1 = weight_variable([1 * num_features/4 * 128, 1024])
 b_fc1 = bias_variable([1024])
 
-h_pool2_flat = tf.reshape(h_pool2, [-1, 1*2500*64])
+h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * num_features/4 * 128])
 h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
 print "h fc1 size: ", h_fc1.get_shape()         # (?, 1024)
 
 keep_prob = tf.placeholder(tf.float32)
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
-W_fc2 = weight_variable([1024, 7])
-b_fc2 = bias_variable([7])
+W_fc2 = weight_variable([1024, len(author_lst)])
+b_fc2 = bias_variable([len(author_lst)])
 
 y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 
@@ -195,7 +201,7 @@ sess.run(tf.global_variables_initializer())
 
 
 t0 = time()
-for i in range(2000):
+for i in range(1000):
   # batch = mnist.train.next_batch(50)
   if i%100 == 0:
 
