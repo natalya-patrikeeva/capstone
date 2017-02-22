@@ -136,3 +136,30 @@ print 'train shape:', x_train.shape
 print 'test shape:', x_test.shape
 print 'vocab_size', len(vocabulary)
 print 'sentence max words', x_train.shape[1]
+
+import mxnet as mx
+import sys,os
+
+'''
+Define batch size and the place holders for network inputs and outputs
+'''
+
+batch_size = 50 # the size of batches to train network with
+print 'batch size', batch_size
+
+input_x = mx.sym.Variable('data') # placeholder for input data
+input_y = mx.sym.Variable('softmax_label') # placeholder for output label
+
+
+'''
+Define the first network layer (embedding)
+'''
+
+# create embedding layer to learn representation of words in a lower dimensional subspace (much like word2vec)
+num_embed = 300 # dimensions to embed words into
+print 'embedding dimensions', num_embed
+
+embed_layer = mx.sym.Embedding(data=input_x, input_dim=vocab_size, output_dim=num_embed, name='vocab_embed')
+
+# reshape embedded data for next layer
+conv_input = mx.sym.Reshape(data=embed_layer, target_shape=(batch_size, 1, sentence_size, num_embed))
