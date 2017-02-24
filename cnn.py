@@ -125,10 +125,12 @@ y_ = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
 l2_loss = tf.constant(0.0)
 
 # embedding_size = 128
-embedding_size = 300
+embedding_size = 500
 
 filter_sizes = [3,4,5]
-num_filters = 128
+# num_filters = 128
+
+num_filters = 300
 # Embedding layer
 W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0))
 embedded_chars = tf.nn.embedding_lookup(W, x)
