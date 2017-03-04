@@ -138,6 +138,8 @@ def train():
     # y_ is the correct classes
     y_ = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
 
+    l2_loss = tf.constant(0.0)
+
     embedding_size = 500
     filter_sizes = [3,4,5]
     num_filters = 500
@@ -181,20 +183,22 @@ def train():
     keep_prob = tf.placeholder(tf.float32)
     h_drop = tf.nn.dropout(h_pool_flat, keep_prob)
 
-    # Final (unnormalized) scores and predictions
+    # Unnormalized scores and predictions
     W = tf.get_variable(
         "W",
         shape=[num_filters_total, num_classes],
         initializer=tf.contrib.layers.xavier_initializer())
     b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
-
+    l2_loss += tf.nn.l2_loss(W)
+    l2_loss += tf.nn.l2_loss(b)
     scores = tf.nn.xw_plus_b(h_drop, W, b)
     predictions = tf.argmax(scores, 1)
 
+    l2_reg_lambda=0.0
     with tf.name_scope('cross_entropy'):
         losses = tf.nn.softmax_cross_entropy_with_logits(scores, y_)
         with tf.name_scope('total'):
-            cross_entropy = tf.reduce_mean(losses)
+            cross_entropy = tf.reduce_mean(losses) + l2_reg_lambda * l2_loss
     tf.summary.scalar('cross_entropy', cross_entropy)
 
     # Accuracy
