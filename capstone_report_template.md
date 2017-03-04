@@ -35,7 +35,7 @@ where *i* is the sample index, *y* is the true label, *y hat* is the predicted c
 
 ## II. Analysis
 ### Data Exploration
-The full dataset `articles.sqlite` contains 87,587 abstracts from 2/2012 through 2/2017. Overall, there are 107,947 authors with the article count ranging from 166 to 1. But for my benchmark and solution models, I will only use a small subset of the data, using top 10 authors with 50 or more abstracts. First, I count the number of articles per author to order them by the number of publications. For simplicity and computational time sake, `cnn.py` Python script limits the number of authors to 10 and compares logistic regression benchmark and CNN models as a proxy to larger number of classes and amount of data.
+The full dataset `articles.sqlite` contains 87,587 abstracts from 2/2012 through 2/2017. Overall, there are 107,947 authors with the article count ranging from 166 to 1. But for my benchmark and solution models, I will only use a small subset of the data, using top 10 authors with 50 or more abstracts. First, I count the number of articles per author to order them by the number of publications. For simplicity and computational time sake, `classify.py` Python script limits the number of authors to 10 and compares logistic regression benchmark and CNN models as a proxy to larger number of classes and amount of data.
 
 I use Pandas library to build a dataframe with one column containing the author and the second column - abstract text. In the database, we might have several authors who collaborated on the publication. So, we need to split the authors and then append the author name and abstract text into one row of a big Pandas dataframe. We end up with 1772 abstracts in the dataframe among these top 10 authors.
 
@@ -135,20 +135,19 @@ So, I decided to use a simpler input dataset with less processing and weighting 
 
 ## IV. Results
 ### Model Evaluation and Validation
-For the model evaluation, we compare the most likely predicted label with a true label during training but also on unseen test dataset. The CNN model achieves the accuracy of 0.93 on the test dataset.
-
-
-
-### Justification
-The CNN model significantly outperforms the logistic regression benchmark model on the test dataset achieving the accuracy of 0.93 as compared to 0.60 for the benchmark model.
+For the model evaluation, we compare the most likely predicted label with a true label during training but also on unseen test dataset. The CNN model achieves the accuracy of 0.90 on the test dataset. In conclusion, the CNN model significantly outperforms the logistic regression benchmark model on the test dataset achieving the accuracy of 0.90 as compared to 0.60 for the benchmark model.
 
 
 
 ## V. Conclusion
 ### Free-Form Visualization
-I plot the cross entropy measure and accuracy over 1000 iterations for training and testing datasets. 
+Using TensorBoard, I plot the cross entropy measure over 500 iterations for training and testing datasets. The x-axis plots the increasing iteration number and the y-axis shows the cross entropy measure. The blue curve is the training data and orange curve is the test dataset. The cross-entropy measure converges to zero for both datasets.
 
+![](./img/cross_entropy.png)
 
+The following plot shows the accuracy over 500 iterations for training and testing datasets. The x-axis plots the increasing iteration number and the y-axis shows the accuracy measure.  The blue curve is the training data and orange curve is the test dataset. We see both curves increase to above 0.9.
+
+![](./img/accuracy.png)
 
 ### Reflection
 I frame my problem as a supervised multiclass classification problem to distinguish among 10 authors of academic publications gathered from the open-source archive. My solution is to build a CNN model using TensorFlow library which significantly imporves my logistic regression benchmark model accuracy on the test data.
@@ -156,5 +155,5 @@ I frame my problem as a supervised multiclass classification problem to distingu
 One challenging aspect was the implementation of the CNN model. I closely followed the tutorials at [tensorflow website](https://www.tensorflow.org/get_started/mnist/pros). However, my raw input data and labels had to be preprocessed and massaged into a form suitable for TensorFlow. I also varied input parameter values like the size of the embedding layer and number of filter to find the best ones.
 
 ### Improvement
-The CNN model training step is very time consuming. So one improvement I would like to suggest is to use batching to train the model instead of the full data which would greatly speed up the training process.
+The CNN model training step is very time consuming. So one improvement I would like to suggest is to use small batches of data to train the model instead of the full dataset which would greatly speed up the training process.
 
