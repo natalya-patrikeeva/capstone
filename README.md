@@ -4,6 +4,8 @@
 
 Python libraries tensorflow, sqlite3, pandas, itertools, numpy, sklearn, argparse, and matplotlib need to be installed. 
 
+### Data
+
 The input dataset `articles.sqlite` to the main script `classify.py` was built using two scripts - `database.py` and `count_db.py`. First, `database.py` collects the data off the web and stores it into an `articles.sqlite` database. The second script `count_db.py` counts the number of articles per author and stores that result in a table in the `articles.sqlite` database.
 
 Note that the full `articles.sqlite` database has already been uploded to this repository to be used by `classify.py` script.
@@ -17,3 +19,7 @@ tensorboard --logdir=/tmp/tensorflow/logs
 ```
 
 The `capstone.ipynb` contains additional data exploration visualizations including a Pareto chart and a word cloud, PCA, logistic regression model and a CNN model.
+
+### License
+
+This project is licensed under the [MIT License](https://choosealicense.com/licenses/mit/).
