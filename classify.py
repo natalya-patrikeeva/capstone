@@ -1,5 +1,4 @@
 import sqlite3
-from HTMLParser import HTMLParser
 import os
 from time import time
 import datetime
