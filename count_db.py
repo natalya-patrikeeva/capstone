@@ -5,12 +5,15 @@ from time import time
 
 t0 = time()
 
+# Open Articles database
 conn = sqlite3.connect('articles.sqlite')
 cur = conn.cursor()
 
+# Make a new table Counts
 cur.execute('''
 DROP TABLE IF EXISTS Counts''')
 
+# The columns in Counts table are author and count
 cur.execute('''
 CREATE TABLE Counts (author_unique TEXT , count INTEGER )''')
 
@@ -18,17 +21,11 @@ cur.execute('''
 SELECT id, author FROM Articles ''')
 
 all_rows = cur.fetchall()
-# print(all_rows)
-
 authors_list = [x[1] for x in all_rows]
-# print "authors: ", authors_list
 
 ids = [x[0] for x in all_rows]
-#print ids
 
-# author_lst = [item for sublist in all_rows[1] for item in sublist]
-
-# Count articles per author
+# Count articles per author and store in Counts table
 for id, author in itertools.izip(ids, authors_list) :
     authors = author.split('; ')
     for i in authors:

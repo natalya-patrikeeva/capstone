@@ -1,217 +1,269 @@
 import sqlite3
 from HTMLParser import HTMLParser
+import os
 from time import time
+import datetime
 import pandas as pd
 import itertools
-
-conn = sqlite3.connect('articles.sqlite')
-cur = conn.cursor()
-
-# select top authors
-top_author = 'SELECT author_unique FROM Counts WHERE count >= 50 ORDER BY count DESC LIMIT 10'
-
-author_doc = []
-author_lst = []
-
-for i in cur.execute(top_author) :
-    author_lst.append(i[0])
-#print "number of unique authors: ", len(author_lst)
-# print "Authors: ", author_lst
-
-d={}
-list_authors = []
-for i, author_correct in enumerate(author_lst):
-    # print "author we want: ", author_correct
-
-    cur.execute('''SELECT abstract, author FROM Articles WHERE author LIKE ? ''', ('%{}%'.format(author_correct), ) )
-    all_rows = cur.fetchall()
-
-    authors_list = [x[1] for x in all_rows]
-    docs = [x[0] for x in all_rows]
-
-    for author, row in itertools.izip(authors_list, docs) :
-        # print "Fetched authors: ", author
-        authors = author.split('; ')
-        for a in authors:
-            if author_correct == a:
-                author_doc.append(row)
-                list_authors.append(a)
-    conn.commit()
-
-df = pd.DataFrame({'author' : list_authors, 'doc': author_doc})
-#print "size: ", df.shape
-#print df.head()
-
-cur.close()
-
-# Data exploration
-print df['author'].value_counts()
-
-# Extract numerical features from text content in abstracts
-
-# Tokenizing abstract text
-from sklearn.feature_extraction.text import CountVectorizer
-count_vect = CountVectorizer(stop_words="english", analyzer = "word", ngram_range=(3, 5), token_pattern=r'\b\w+\b', max_features=1000)
-
-data = count_vect.fit_transform(df['doc'])
-#print "data: ", data.shape
-
-# Split into train and test sets
-from sklearn.cross_validation import train_test_split
-features_train, features_test, labels_train, labels_test = train_test_split(
-    data, df['author'], test_size = 0.1, random_state=3)
-
-# print "labels_train: ", len(labels_train) # 139
-# print "features_train: ", features_train.shape # (139, 5000)
-# print "features_test: ", features_test.shape # (16, 5000)
-###################################
-# Convert labels to factor for Tensor Flow
-labels_train_tf = labels_train.astype('category')
-labels_train_tf = labels_train_tf.cat.codes
-
-labels_test_tf = labels_test.astype('category')
-labels_test_tf = labels_test_tf.cat.codes
-
-from sklearn import preprocessing
-lb = preprocessing.LabelBinarizer()
-lb.fit(labels_train_tf)
-# print "classes: ", lb.classes_
-labels_train_tf = lb.transform(labels_train_tf)
-# print "transformed labels: ", labels_train_tf
-
-lb_test = preprocessing.LabelBinarizer()
-lb_test.fit(labels_test_tf)
-labels_test_tf = lb_test.transform(labels_test_tf)
-###################################
-
-# Term Frequency times Inverse Document Frequency
-from sklearn.feature_extraction.text import TfidfTransformer
-tfidf_transformer = TfidfTransformer()
-X_train_tfidf = tfidf_transformer.fit_transform(features_train).toarray()
-X_test_tfidf = tfidf_transformer.fit_transform(features_test).toarray()
-
-#print "Input data shape: ", X_train_tfidf.shape     #(1054, 10000)
-#######################
-# Logistic Regression - Benchmark
+import numpy as np
 from sklearn import linear_model
-print "starting log reg modeling..."
-
-
-t0 = time()
-clf = linear_model.LogisticRegression(solver='sag', max_iter=1000, random_state=42,
-                                 multi_class="ovr").fit(X_train_tfidf, labels_train)
-pred = clf.predict(X_test_tfidf)
-
-from sklearn.metrics import accuracy_score
-acc = accuracy_score(pred, labels_test)
-
-tt = time()-t0
-print("Training Log Regression took: {}").format(round(tt,3))
-print "Accuracy score on test data is {}.".format(round(acc,4))
-##################################
-# Tensor Flow
-#
-# 10000 features
-# 62 classes (authors)
-# Naive model first
+import argparse
+import sys
 import tensorflow as tf
-num_features = 1000
 
-x = tf.placeholder(tf.float32, [None, num_features])
-# W = tf.Variable(tf.zeros([num_features, len(author_lst)]))
-# b = tf.Variable(tf.zeros([len(author_lst)]))
-# # model
-# y = tf.nn.softmax(tf.matmul(x, W) + b)
-#
-# # train
-# y_ is the correct classes
-y_ = tf.placeholder(tf.float32, [None, len(author_lst)])
-# cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y))
-# train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
-init = tf.global_variables_initializer()
-sess = tf.Session()
-sess.run(init)
-#
-#
-# for i in range(1000):
-#   sess.run(train_step, feed_dict={x: X_train_tfidf, y_: labels_train_tf})
-#
-# correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
-# accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-#
-# # accuracy on test data.
-# print "Tensor Flow accuracy on test data:"
-# print(sess.run(accuracy, feed_dict={x: X_test_tfidf, y_: labels_test_tf}))
+FLAGS = None
 
-# Multilayer convolutional network
+def train():
+    # Load data from Articles database
+    conn = sqlite3.connect('articles.sqlite')
+    cur = conn.cursor()
 
-def weight_variable(shape):
-  initial = tf.truncated_normal(shape, stddev=0.1)
-  return tf.Variable(initial)
+    # select top authors
+    top_author = 'SELECT author_unique FROM Counts WHERE count >= 50 ORDER BY count DESC LIMIT 10'
 
-def bias_variable(shape):
-  initial = tf.constant(0.1, shape=shape)
-  return tf.Variable(initial)
+    author_doc = []
+    author_lst = []
 
-def conv2d(x, W):
-  return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+    for i in cur.execute(top_author) :
+        author_lst.append(i[0])
 
-def max_pool_2x2(x):
-  return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
-                        strides=[1, 2, 2, 1], padding='SAME')
+    d={}
+    list_authors = []
+    for i, author_correct in enumerate(author_lst):
+        cur.execute('''SELECT abstract, author FROM Articles WHERE author LIKE ? ''', ('%{}%'.format(author_correct), ) )
+        all_rows = cur.fetchall()
 
-W_conv1 = weight_variable([1, 25, 1, 64])
-b_conv1 = bias_variable([64])
+        authors_list = [x[1] for x in all_rows]
+        docs = [x[0] for x in all_rows]
 
-x_image = tf.reshape(x, [-1,1,num_features,1])
-h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
-print "h conv 1 size: ", h_conv1.get_shape()    # (?, 1, 10000, 32)
+        for author, row in itertools.izip(authors_list, docs) :
+            authors = author.split('; ')
+            for a in authors:
+                if author_correct == a:
+                    author_doc.append(row)
+                    list_authors.append(a)
+        conn.commit()
 
-h_pool1 = max_pool_2x2(h_conv1)
-print "h pool 1 size: ", h_pool1.get_shape()   # (?, 1, 5000, 32)
+    df = pd.DataFrame({'author' : list_authors, 'doc': author_doc})
+    cur.close()
 
-W_conv2 = weight_variable([1, 25, 64, 128])
-b_conv2 = bias_variable([128])
+    # Data exploration
+    print df['author'].value_counts()
 
-h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-print "h conv 2 size: ", h_conv2.get_shape()    # (?, 1, 5000, 64)
-h_pool2 = max_pool_2x2(h_conv2)
-print "h pool 2 size: ", h_pool2.get_shape()    # (?, 1, 2500, 64)
+    # Pad documents to the same max length as the longest doc
+    vocab = []
+    lengths = []
 
-W_fc1 = weight_variable([1 * num_features/4 * 128, 1024])
-b_fc1 = bias_variable([1024])
+    for i in range(df.shape[0]):
+        doc = df['doc'][i]
+        doc_split = doc.split(" ")
+        lengths.append(len(doc_split))
 
-h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * num_features/4 * 128])
-h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-print "h fc1 size: ", h_fc1.get_shape()         # (?, 1024)
+    max_length = max(lengths)
+    print "max doc length: ", max_length
 
-keep_prob = tf.placeholder(tf.float32)
-h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
-
-W_fc2 = weight_variable([1024, len(author_lst)])
-b_fc2 = bias_variable([len(author_lst)])
-
-y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
-
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_conv, y_))
-train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-sess.run(tf.global_variables_initializer())
+    for i in range(df.shape[0]):
+        doc = df['doc'][i]
+        doc_split = doc.split(" ")
+        # How much to pad each doc
+        padding_num = max_length - len(doc_split)
+        doc_new = doc + " </PAD>" * padding_num
+        words = doc_new.split(" ")
+        vocab.append(words)
 
 
-t0 = time()
-for i in range(1000):
-  # batch = mnist.train.next_batch(50)
-  if i%100 == 0:
+    from collections import Counter
+    word_counts = Counter(itertools.chain(*vocab))
 
-      train_accuracy = accuracy.eval(session=sess, feed_dict={ x: X_train_tfidf, y_: labels_train_tf, keep_prob: 1.0})
-      print("step %d, training accuracy %g"%(i, train_accuracy))
-  train_step.run(session=sess, feed_dict={x: X_train_tfidf, y_: labels_train_tf, keep_prob: 0.5})
+    # Mapping from index to word
+    vocabulary_inv = [x[0] for x in word_counts.most_common()]
+
+    # Mapping from word to index
+    vocabulary = {x: i for i, x in enumerate(vocabulary_inv)}
+
+    # Map docs and labels (authors) to vectors based on a vocabulary
+    print "vocab shape: ", len(vocabulary)
+    x = np.array([ [ vocabulary[word] for word in doc ] for doc in vocab ])
+    print "x size: ", x.shape
+
+    # Convert labels to factor for TensorFlow
+    labels = df['author'].astype('category')
+    labels = labels.cat.codes
+    labels_unique = np.unique(labels)
+
+    from sklearn import preprocessing
+    lb = preprocessing.LabelBinarizer()
+    lb.fit(labels)
+    labels_tf = lb.transform(labels)
+    print "labels: ", labels_tf.shape
+
+    # Stratified split of data and labels
+    from sklearn.model_selection import StratifiedShuffleSplit
+    sss = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=0)
+    for train_index, test_index in sss.split(x, labels_tf):
+        # print "train index: ", train_index
+        x_train, x_test = x[train_index], x[test_index]
+        y_train, y_test = labels_tf[train_index], labels_tf[test_index]
+
+        # For logistic regression model, we simply need the labels (not one-hot vectors)
+        labels_train, labels_test = df['author'][train_index], df['author'][test_index]
+
+    vocab_size = len(vocabulary)
+    doc_size = x_train.shape[1]
+    print "Train/test split: %d/%d" % (len(y_train), len(y_test))
+    print 'train shape:', x_train.shape
+    print 'test shape:', x_test.shape
+    print 'vocab_size', len(vocabulary)
+    print 'sentence max words', x_train.shape[1]
+
+    # Benchmark model
+    print "starting log reg modeling..."
+
+    t0 = time()
+    clf = linear_model.LogisticRegression(solver='sag', max_iter=1000, random_state=42,
+                                     multi_class="ovr").fit(x_train, labels_train)
+    pred = clf.predict(x_test)
+
+    from sklearn.metrics import accuracy_score
+    acc = accuracy_score(pred, labels_test)
+
+    tt = time()-t0
+    print("Training Log Regression took: {}").format(round(tt,3))
+    print "Accuracy score on test data is {}.".format(round(acc,4))
+
+    # CNN model
+
+    num_classes = len(labels_unique)
+    x = tf.placeholder(tf.int32, [None, x_train.shape[1]], name="input_x")
+
+    # y_ is the correct classes
+    y_ = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
+
+    embedding_size = 500
+    filter_sizes = [3,4,5]
+    num_filters = 500
+
+    # Embedding layer
+    W = tf.Variable(tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0))
+    # embedding operation
+    embedded_chars = tf.nn.embedding_lookup(W, x)
+    embedded_chars_expanded = tf.expand_dims(embedded_chars, -1)
+
+    # Create a convolution + maxpool layer for each filter size
+    pooled_outputs = []
+    for i, filter_size in enumerate(filter_sizes):
+        # Convolution Layer
+        filter_shape = [filter_size, embedding_size, 1, num_filters]
+        W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1))
+        b = tf.Variable(tf.constant(0.1, shape=[num_filters]))
+        conv = tf.nn.conv2d(
+            embedded_chars_expanded,
+            W,
+            strides=[1, 1, 1, 1],
+            padding="VALID")
+
+        # Apply nonlinearity
+        h = tf.nn.relu(tf.nn.bias_add(conv, b))
+
+        # Maxpooling over the outputs
+        pooled = tf.nn.max_pool(
+            h,
+            ksize=[1, doc_size - filter_size + 1, 1, 1],
+            strides=[1, 1, 1, 1],
+            padding='VALID')
+        pooled_outputs.append(pooled)
+
+    # Combine all the pooled features
+    num_filters_total = num_filters * len(filter_sizes)
+    h_pool = tf.concat(3, pooled_outputs)
+    h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+
+    # Add dropout
+    keep_prob = tf.placeholder(tf.float32)
+    h_drop = tf.nn.dropout(h_pool_flat, keep_prob)
+
+    # Final (unnormalized) scores and predictions
+    W = tf.get_variable(
+        "W",
+        shape=[num_filters_total, num_classes],
+        initializer=tf.contrib.layers.xavier_initializer())
+    b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
+
+    scores = tf.nn.xw_plus_b(h_drop, W, b)
+    predictions = tf.argmax(scores, 1)
+
+    with tf.name_scope('cross_entropy'):
+        losses = tf.nn.softmax_cross_entropy_with_logits(scores, y_)
+        with tf.name_scope('total'):
+            cross_entropy = tf.reduce_mean(losses)
+    tf.summary.scalar('cross_entropy', cross_entropy)
+
+    # Accuracy
+    with tf.name_scope('accuracy'):
+        correct_predictions = tf.equal(predictions, tf.argmax(y_, 1))
+        with tf.name_scope('accuracy'):
+            accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"))
+    tf.summary.scalar('accuracy', accuracy)
+
+    # Merge all the summaries and write them out to /tmp/tensorflow/logs
+    merged = tf.summary.merge_all()
 
 
-tt = time()-t0
-print("Training TensorFlow NN took: {}").format(round(tt,3))
+    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+    test_writer = tf.summary.FileWriter(FLAGS.log_dir + '/test')
 
-print("test accuracy %g"%accuracy.eval(session=sess, feed_dict={
-    x: X_test_tfidf, y_: labels_test_tf, keep_prob: 1.0}))
+    init = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(init)
+
+    train_writer = tf.summary.FileWriter(FLAGS.log_dir + '/train', sess.graph)
+
+    t0 = time()
+    for i in range(500):
+
+        # Record summaries and test-set accuracy
+        if i % 10 == 0:
+            summary, acc = sess.run([merged, accuracy], feed_dict={x: x_test, y_: y_test, keep_prob: 1.0})
+            test_writer.add_summary(summary, i)
+            print('Accuracy at step %s: %s' % (i, acc))
+
+        # Record train set summaries, and train
+        else:
+
+            # Record execution stats
+            if i % 100 == 99:
+                summary, _ = sess.run([merged, train_step], feed_dict={ x: x_train, y_: y_train, keep_prob: 0.5})
+                train_writer.add_summary(summary, i)
+
+            # Record a summary
+            else:
+                summary, _ = sess.run([merged, train_step], feed_dict={x: x_train, y_: y_train, keep_prob: 0.5})
+                train_writer.add_summary(summary, i)
+
+
+    tt = time()-t0
+    print("Training TensorFlow NN took: {}").format(round(tt,3))
+
+    print("test accuracy %g"%accuracy.eval(session=sess, feed_dict={
+        x: x_test, y_: y_test, keep_prob: 1.0}))
+
+    train_writer.close()
+    test_writer.close()
+
+
+def main(_):
+  if tf.gfile.Exists(FLAGS.log_dir):
+    tf.gfile.DeleteRecursively(FLAGS.log_dir)
+  tf.gfile.MakeDirs(FLAGS.log_dir)
+  train()
+
+
+# To visualize TensorBoard graphs, after running the script,
+# run:
+# tensorboard --logdir=/tmp/tensorflow/logs
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--log_dir', type=str, default='/tmp/tensorflow/logs',
+                      help='Summaries log directory')
+    FLAGS, unparsed = parser.parse_known_args()
+    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
