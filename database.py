@@ -27,7 +27,7 @@ cur = conn.cursor()
 #
 
 
-# Unique article ID - Want to make sure to visit articles ONCE
+# Unique article ID
 def get_id(url):
     html = urllib.urlopen(url).read()
     soup = BeautifulSoup(html, "lxml")
@@ -77,50 +77,36 @@ def stem(text):
 
     return stems
 
-#search_url = "https://arxiv.org/list/cs/pastweek?skip=0&show=5"
-#search_url = "http://xxx.lanl.gov/list/cs/pastweek?show=470"
-#search_url = "http://xxx.lanl.gov/list/cs/pastweek?show=496"
-#search_url = "http://xxx.lanl.gov/list/cs/new"
-#search_url = "http://xxx.lanl.gov/list/cs/1702?show=578"
-# search_url = "http://xxx.lanl.gov/list/cs/1701?skip=0&show=2000"
-# search_url = "http://xxx.lanl.gov/list/cs/1701?skip=2000&show=2000"
-#search_url = "http://xxx.lanl.gov/list/cs/1612?skip=0&show=2000"  # took 62.6 min
-# search_url = "http://xxx.lanl.gov/list/cs/1612?skip=2000&show=2000"
-# search_url = "http://xxx.lanl.gov/list/cs/1611?skip=0&show=2000" # took 62.65 min
-# search_url = "http://xxx.lanl.gov/list/cs/1611?skip=2000&show=2000"
-# search_url = "http://xxx.lanl.gov/list/cs/1610?skip=0&show=2000"  # took 61.9 min
-# search_url = "http://xxx.lanl.gov/list/cs/1610?skip=2000&show=2000"
-# search_url = "http://xxx.lanl.gov/list/cs/1609?skip=0&show=2000"
-
 # loop over Computer Science for different months
 
-# years = ['17, '16', '15', '14', 13', '12']
-months = ["06", "07", "08", "09", "10", "11", "12"]
+years = ['17', '16', '15', '14', '13', '12']
+months = ['06', '07', '08', '09', '10', '11', '12']
+for year in years:
 
-for month in months:
+    for month in months:
 
-    search_url = urljoin('http://xxx.lanl.gov/list/cs/', str('12' + month + '?skip=0&show=2000'))
-    # search_url = urljoin('http://xxx.lanl.gov/list/cs/', str('15' + month + '?skip=2000&show=2000'))
+        search_url = urljoin('http://xxx.lanl.gov/list/cs/', str(year + month + '?skip=0&show=2000'))
+        # search_url = urljoin('http://xxx.lanl.gov/list/cs/', str(year + month + '?skip=2000&show=2000'))
 
-    print(search_url)
+        # print(search_url)
 
-    html = urllib.urlopen(search_url).read()
-    soup = BeautifulSoup(html, "lxml")
+        html = urllib.urlopen(search_url).read()
+        soup = BeautifulSoup(html, "lxml")
 
-    for article_id, i in itertools.izip(soup.find_all("a", attrs={'title': "Abstract" } ), range(len(soup.find_all("a", attrs={'title': "Abstract" } ))) ):
-        #url = urljoin('https://arxiv.org', article_id.get("href"))
-        url = urljoin('http://xxx.lanl.gov/', article_id.get("href"))
-        article_id = get_id(url)
-        authors = authors_list(url)
+        for article_id, i in itertools.izip(soup.find_all("a", attrs={'title': "Abstract" } ), range(len(soup.find_all("a", attrs={'title': "Abstract" } ))) ):
+            #url = urljoin('https://arxiv.org', article_id.get("href"))
+            url = urljoin('http://xxx.lanl.gov/', article_id.get("href"))
+            article_id = get_id(url)
+            authors = authors_list(url)
 
-        abstract_txt = abstract_text(url)
-        stems = stem(abstract_txt)
+            abstract_txt = abstract_text(url)
+            stems = stem(abstract_txt)
 
-        params = (article_id, authors, stems)
+            params = (article_id, authors, stems)
 
-        cur.execute('''
-        INSERT OR IGNORE INTO Articles VALUES (?, ?, ?)''', params)
-        conn.commit()
+            cur.execute('''
+            INSERT OR IGNORE INTO Articles VALUES (?, ?, ?)''', params)
+            conn.commit()
 
 conn.close()
 
