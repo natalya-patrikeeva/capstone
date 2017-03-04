@@ -6,9 +6,9 @@ The first script to run is `database.py` that collects the data off the web and 
 
 The second script `count_db.py` counts the number of articles per author and stores that result in a table in the `articles.sqlite` database.
 
-Note that the full database has already been uploded to this repository to be used by `classify.py` script.
+Note that the full `articles.sqlite` database has already been uploded to this repository to be used by `classify.py` script.
 
-The main script `classify.py` first loads the data from the `articles.sqlite` database and runs the benchmark logistic regression model and then a convolutional neural network model, computes the accuracy score using a test dataset. For a CNN model, the script stores the result to be visualized using TensorBoard. 
+The main script `classify.py` first loads the data from the `articles.sqlite` database and runs the benchmark logistic regression model and then a convolutional neural network model, and computes the accuracy score using a test dataset. For a CNN model, the script stores the result to be visualized using TensorBoard. 
 
 After the script is run succesfully, you can run the following command to visualize the accuracy and cross entropy measures for training and testing datasets:
 

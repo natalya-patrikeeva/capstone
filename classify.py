@@ -131,7 +131,7 @@ def train():
     print "Accuracy score on test data is {}.".format(round(acc,4))
 
     # CNN model
-
+    print "starting CNN modeling..."
     num_classes = len(labels_unique)
     x = tf.placeholder(tf.int32, [None, x_train.shape[1]], name="input_x")
 
@@ -224,7 +224,7 @@ def train():
         if i % 10 == 0:
             summary, acc = sess.run([merged, accuracy], feed_dict={x: x_test, y_: y_test, keep_prob: 1.0})
             test_writer.add_summary(summary, i)
-            print('Accuracy at step %s: %s' % (i, acc))
+            print('Test accuracy at step %s: %s' % (i, acc))
 
         # Record train set summaries, and train
         else:
