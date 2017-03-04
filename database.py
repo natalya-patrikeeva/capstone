@@ -13,18 +13,18 @@ t0 = time()
 conn = sqlite3.connect('articles.sqlite')
 cur = conn.cursor()
 
-# cur.execute('''
-# DROP TABLE IF EXISTS Articles''')
-#
-# cur.execute('''
-# CREATE TABLE Articles (id TEXT PRIMARY KEY )''')
-#
-# cur.execute('''
-# ALTER TABLE Articles ADD COLUMN 'author' BLOB''')
-#
-# cur.execute('''
-# ALTER TABLE Articles ADD COLUMN 'abstract' TEXT''')
-#
+cur.execute('''
+DROP TABLE IF EXISTS Articles''')
+
+cur.execute('''
+CREATE TABLE Articles (id TEXT PRIMARY KEY )''')
+
+cur.execute('''
+ALTER TABLE Articles ADD COLUMN 'author' BLOB''')
+
+cur.execute('''
+ALTER TABLE Articles ADD COLUMN 'abstract' TEXT''')
+
 
 
 # Unique article ID
@@ -78,35 +78,35 @@ def stem(text):
     return stems
 
 # loop over Computer Science for different months
-
+pages = ['0', '2000']
 years = ['17', '16', '15', '14', '13', '12']
-months = ['06', '07', '08', '09', '10', '11', '12']
-for year in years:
+months = ['01','02', '03', '04','05','06', '07', '08', '09', '10', '11', '12']
+for page in pages:
+    for year in years:
 
-    for month in months:
+        for month in months:
 
-        search_url = urljoin('http://xxx.lanl.gov/list/cs/', str(year + month + '?skip=0&show=2000'))
-        # search_url = urljoin('http://xxx.lanl.gov/list/cs/', str(year + month + '?skip=2000&show=2000'))
+            search_url = urljoin('http://xxx.lanl.gov/list/cs/', str(year + month + '?skip=' + page + '&show=2000'))
 
-        # print(search_url)
+            print(search_url)
 
-        html = urllib.urlopen(search_url).read()
-        soup = BeautifulSoup(html, "lxml")
+            html = urllib.urlopen(search_url).read()
+            soup = BeautifulSoup(html, "lxml")
 
-        for article_id, i in itertools.izip(soup.find_all("a", attrs={'title': "Abstract" } ), range(len(soup.find_all("a", attrs={'title': "Abstract" } ))) ):
-            #url = urljoin('https://arxiv.org', article_id.get("href"))
-            url = urljoin('http://xxx.lanl.gov/', article_id.get("href"))
-            article_id = get_id(url)
-            authors = authors_list(url)
+            for article_id, i in itertools.izip(soup.find_all("a", attrs={'title': "Abstract" } ), range(len(soup.find_all("a", attrs={'title': "Abstract" } ))) ):
+                #url = urljoin('https://arxiv.org', article_id.get("href"))
+                url = urljoin('http://xxx.lanl.gov/', article_id.get("href"))
+                article_id = get_id(url)
+                authors = authors_list(url)
 
-            abstract_txt = abstract_text(url)
-            stems = stem(abstract_txt)
+                abstract_txt = abstract_text(url)
+                stems = stem(abstract_txt)
 
-            params = (article_id, authors, stems)
+                params = (article_id, authors, stems)
 
-            cur.execute('''
-            INSERT OR IGNORE INTO Articles VALUES (?, ?, ?)''', params)
-            conn.commit()
+                cur.execute('''
+                INSERT OR IGNORE INTO Articles VALUES (?, ?, ?)''', params)
+                conn.commit()
 
 conn.close()
 
