@@ -1,4 +1,4 @@
-## Convolutional Neural Networks for multiclass document classification 
+## Convolutional Neural Network for multiclass document classification 
 
 ### Software and Libraries used in the project
 
@@ -6,9 +6,9 @@ Python libraries tensorflow, sqlite3, pandas, itertools, numpy, sklearn, argpars
 
 ### Data
 
-The input dataset `articles.sqlite` to the main script `classify.py` was built using two scripts - `database.py` and `count_db.py`. First, `database.py` collects the data off the web and stores it into an `articles.sqlite` database. The second script `count_db.py` counts the number of articles per author and stores that result in a table in the `articles.sqlite` database.
+The input dataset `articles.sqlite` to the main script `classify.py` was built using two scripts - `database.py` and `count_db.py`. First, `database.py` collects the data off the web in a form of published article abstracts and their authors and stores it into an `articles.sqlite` database. The second script `count_db.py` counts the number of articles per author and stores that result in a table in the `articles.sqlite` database.
 
-Note that the full `articles.sqlite` database has already been uploded to this repository to be used by `classify.py` script.
+Note that the full `articles.sqlite` database has already been uploaded to this repository to be used by `classify.py` script.
 
 The script `classify.py` first loads the data from the `articles.sqlite` database and runs the benchmark logistic regression model and then a convolutional neural network model, and computes the accuracy score using a test dataset. For a CNN model, the script stores the result to be visualized using TensorBoard. 
 
