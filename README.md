@@ -18,7 +18,7 @@ After the script is run succesfully, you can run the following command to visual
 tensorboard --logdir=/tmp/tensorflow/logs
 ```
 
-The `capstone.ipynb` contains additional data exploration visualizations including a Pareto chart and a word cloud, PCA, logistic regression model and a CNN model.
+The `capstone.ipynb` contains additional data exploration visualizations including a Pareto chart and a word cloud, logistic regression model and a CNN model.
 
 ### License
 
