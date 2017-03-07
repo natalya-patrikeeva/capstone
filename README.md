@@ -2,7 +2,7 @@
 
 ### Software and Libraries used in the project
 
-Python libraries tensorflow, sqlite3, pandas, itertools, numpy, sklearn, argparse, and matplotlib need to be installed. 
+Python libraries tensorflow, sqlite3, pandas, itertools, numpy, sklearn, argparse, string, nltk, and matplotlib need to be installed. 
 
 ### Data
 
