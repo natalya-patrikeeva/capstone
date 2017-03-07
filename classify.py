@@ -6,11 +6,28 @@ import pandas as pd
 import itertools
 import numpy as np
 from sklearn import linear_model
+from sklearn.feature_extraction.text import TfidfVectorizer
+import string
+from nltk import SnowballStemmer
 import argparse
 import sys
 import tensorflow as tf
 
 FLAGS = None
+
+def stem(text):
+    stems = []
+    exclude = set(string.punctuation)
+    words = text.split()
+    for word in words:
+        # remove punctuation
+        word = ''.join(ch for ch in word if ch not in exclude)
+        # remove digits
+        word = ''.join( [i for i in word if not i.isdigit()] )
+        # stem words
+        word = SnowballStemmer("english").stem(word)
+        stems.append(word)
+    return stems
 
 def train():
     # Load data from Articles database
@@ -118,11 +135,22 @@ def train():
     # Benchmark model
     print "starting log reg modeling..."
 
-    t0 = time()
-    clf = linear_model.LogisticRegression(solver='sag', max_iter=1000, random_state=42,
-                                     multi_class="ovr").fit(x_train, labels_train)
-    pred = clf.predict(x_test)
+    # define vectorizer parameters
+    tfidf_vectorizer = TfidfVectorizer(max_df=0.9, max_features=1000,
+                                     min_df=0.05, stop_words='english',
+                                     use_idf=True, tokenizer=stem, ngram_range=(1,3))
 
+    # fit the vectorizer to synopses
+    tfidf_matrix = tfidf_vectorizer.fit_transform(df['doc'])
+
+    for train_index, test_index in sss.split(x, labels_tf):
+        X_logit_train, X_logit_test = tfidf_matrix[train_index], tfidf_matrix[test_index]
+        labels_train, labels_test = df['author'][train_index], df['author'][test_index]
+
+    t0 = time()
+    clf = linear_model.LogisticRegression(max_iter=500, random_state=42,
+                                     multi_class="ovr").fit(X_logit_train, labels_train)
+    pred = clf.predict(X_logit_test)
     from sklearn.metrics import accuracy_score
     acc = accuracy_score(pred, labels_test)
 
@@ -130,6 +158,8 @@ def train():
     print("Training Log Regression took: {}").format(round(tt,3))
     print "Accuracy score on test data is {}.".format(round(acc,4))
 
+
+    ######################################################################
     # CNN model
     print "starting CNN modeling..."
     num_classes = len(labels_unique)
